@@ -3,69 +3,85 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
-const _ = require("lodash");
+const mongoose = require('mongoose');
+const showdown = require('showdown');
 
 const homeStartingContent = "Blogging is to writing what extreme sports are to athletics: more free-form, more accident-prone, less formal, more alive. It is, in many ways, writing out loud.";
-const aboutContent = "There's No Us here, It's Just me. Bore marra.. :(";
-const contactContent = "Again there is no us, It's just me and nako karo contact.. :D";
+const aboutContent = "THIS IS ABOUT PAGE";
+const contactContent = "THIS WILL BE CONTACT PAGE";
 
 const app = express();
-
-let posts = [];
 
 app.set('view engine', 'ejs');
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
 
-app.get("/", function(req,res){
-  res.render("home", {
-    homeStartingContent:homeStartingContent,
-    posts:posts
+mongoose.connect("mongodb+srv://analytics:analytics-password@mflix.mejgm.mongodb.net/blogDB?retryWrites=true&w=majority", {useNewUrlParser: true, useUnifiedTopology: true});
+
+const postSchema = {
+  title: String,
+  description: String,
+  content: String,
+  author: String
+};
+
+const Post = mongoose.model("Post", postSchema);
+
+app.get("/", function(req, res){
+
+  Post.find({}, function(err, posts){
+    res.render("home", {
+      homeStartingContent:homeStartingContent,
+      posts: posts
+      });
   });
-  
 });
 
-app.get("/about", function(req,res){
-  res.render("about", {aboutContent:aboutContent});
-})
-
-app.get("/contact", function(req,res){
-  res.render("contact", {contactContent:contactContent});
-})
-
-app.get("/compose", function(req,res){
+app.get("/compose", function(req, res){
   res.render("compose");
-})
+});
 
-app.post("/compose", function(req,res){
-  let inputText = req.body.titleText;
-
-  var post = {
+app.post("/compose", function(req, res){
+  const post = new Post({
     title: req.body.postTitle,
-    content: req.body.postBody
-  }
+    description: req.body.postDescription,
+    content: req.body.postBody,
+    author: req.body.postAuthor
+  });
 
-  posts.push(post);
 
-  res.redirect('/');
-})
-
-app.get("/posts/:postName", function(req,res){
-  const requestedTitle = _.lowerCase(req.params.postName);
-
-  posts.forEach(function(post){
-    const storedTitle = _.lowerCase(post.title);
-
-    if (storedTitle === requestedTitle) {
-      res.render('post', {
-        title: post.title,
-        content: post.content
-      })
+  post.save(function(err){
+    if (!err){
+        res.redirect("/");
     }
-  })
-})
+  });
+});
 
-app.listen(process.env.PORT || 3000, function(){
-  console.log("server is running..");
-})
+app.get("/posts/:postId", function(req, res){
+
+const requestedPostId = req.params.postId;
+var converter = new showdown.Converter();
+
+  Post.findOne({_id: requestedPostId}, function(err, post){
+    res.render("post", {
+      title: post.title,
+      content: converter.makeHtml(post.content),
+      author: post.author
+    });
+  });
+
+});
+
+app.get("/about", function(req, res){
+  res.render("about", {aboutContent: aboutContent});
+});
+
+app.get("/contact", function(req, res){
+  res.render("contact", {contactContent: contactContent});
+});
+
+
+app.listen(3000, function() {
+  console.log("Server started on port 3000");
+});
